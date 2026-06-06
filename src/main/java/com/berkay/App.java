@@ -1,7 +1,9 @@
 package com.berkay;
 
+import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.highgui.HighGui;
+import org.opencv.imgproc.Imgproc;
 import org.opencv.videoio.VideoCapture;
 
 import nu.pattern.OpenCV;
@@ -17,26 +19,63 @@ public class App {
             return;
         }
 
-        Mat frame = new Mat();
+        Mat previousFrame = new Mat();
+        Mat currentFrame = new Mat();
+
+        Mat previousGray = new Mat();
+        Mat currentGray = new Mat();
+
+        Mat difference = new Mat();
+        Mat threshold = new Mat();
+
+        boolean firstFrameRead = camera.read(previousFrame);
+
+        if (!firstFrameRead || previousFrame.empty()) {
+            System.out.println("Could not read first frame.");
+            camera.release();
+            return;
+        }
+
+        Imgproc.cvtColor(previousFrame, previousGray, Imgproc.COLOR_BGR2GRAY);
+
+        HighGui.namedWindow("Camera", HighGui.WINDOW_NORMAL);
+        HighGui.namedWindow("Motion Detection", HighGui.WINDOW_NORMAL);
+
+        HighGui.resizeWindow("Camera", 600, 400);
+        HighGui.resizeWindow("Motion Detection", 600, 400);
+
+        HighGui.moveWindow("Camera", 0, 80);
+        HighGui.moveWindow("Motion Detection", 620, 80);
 
         while (true) {
-            boolean success = camera.read(frame);
+            boolean success = camera.read(currentFrame);
 
-            if (!success || frame.empty()) {
+            if (!success || currentFrame.empty()) {
                 System.out.println("Could not read frame from camera.");
                 break;
             }
 
-            HighGui.imshow("Motion Detection", frame);
+            Imgproc.cvtColor(currentFrame, currentGray, Imgproc.COLOR_BGR2GRAY);
 
-            int key = HighGui.waitKey(30);
+            Core.absdiff(previousGray, currentGray, difference);
 
-            if (key == 27 || key == 'q') {
+            Imgproc.threshold(difference, threshold, 25, 255, Imgproc.THRESH_BINARY);
+
+            HighGui.imshow("Camera", currentFrame);
+            HighGui.imshow("Motion Detection", threshold);
+
+            currentGray.copyTo(previousGray);
+
+            int key = HighGui.waitKey(30) & 0xFF;
+
+            if (key == 27) {
+                System.out.println("Program is closing...");
                 break;
             }
         }
 
         camera.release();
         HighGui.destroyAllWindows();
+        System.exit(0);
     }
 }
